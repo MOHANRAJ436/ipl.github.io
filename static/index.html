@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mock IPL Auction</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        label,
+        input {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        input {
+            width: 100%;
+            padding: 5px;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 5px 10px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .error {
+            color: red;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        #result {
+            margin-bottom: 20px;
+        }
+
+        #purse,
+        #players-sold {
+            margin-top: 20px;
+        }
+
+        #players-sold ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        #players-sold ul li {
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Mock IPL Auction</h1>
+    <div class="container">
+        <div id="player-form">
+            <label for="player-name">Player Name:</label>
+            <input type="text" id="player-name" placeholder="Enter player name">
+
+            <label for="price">Price:</label>
+            <input type="text" id="price" placeholder="Enter price (e.g., '1 CR' or '50L')">
+
+            <label for="team">Team:</label>
+            <input type="text" id="team" placeholder="Enter sold team">
+
+            <button onclick="submitBid()">Submit Bid</button>
+        </div>
+        <div id="result"></div>
+        <div id="purse"></div>
+        <div id="players-sold"></div>
+    </div>
+
+    <script>
+        let playersSold = [];
+
+        function convert_to_int(price_str) {
+            try {
+                if (price_str.includes('CR')) {
+                    return parseInt(parseFloat(price_str.replace('CR', '')) * 100_00_000);
+                } else if (price_str.includes('L')) {
+                    return parseInt(parseFloat(price_str.replace('L', '')) * 1_00_000);
+                } else {
+                    return null;
+                }
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function updatePurse(teams) {
+            const sortedTeams = Object.entries(teams)
+                .sort(([, a], [, b]) => b - a)
+                .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+
+            let purseHtml = '<h2>Remaining Purse for All Teams</h2>';
+            purseHtml += '<ul>';
+            for (const [team, purse] of Object.entries(sortedTeams)) {
+                const purseInCrores = (purse / 100_00_000).toFixed(2);
+                purseHtml += `<li>${team}: ${purseInCrores}CR</li>`;
+            }
+            purseHtml += '</ul>';
+            document.getElementById('purse').innerHTML = purseHtml;
+        }
+
+        function updatePlayersSold(playersSold) {
+    const teamOrder = ['CSK', 'MI', 'RCB', 'SRH', 'KKR', 'GT', 'DC', 'PBKS', 'RR', 'LSG'];
+
+    let playersSoldHtml = '<h2>Players Sold</h2>';
+    playersSoldHtml += '<ul>';
+
+    playersSold.sort((a, b) => {
+        return teamOrder.indexOf(a.team) - teamOrder.indexOf(b.team);
+    });
+    playersSold.forEach(player => {
+        // Convert price to crore format
+        const priceInCrore = (player.price / 100_00_000).toFixed(2);
+        playersSoldHtml += `<li>${player.playerName} - ${priceInCrore}CR - ${player.team}</li>`;
+    });
+    playersSoldHtml += '</ul>';
+    document.getElementById('players-sold').innerHTML = playersSoldHtml;
+}
+
+
+function submitBid() {
+    const playerName = document.getElementById('player-name').value.trim();
+    const price = document.getElementById('price').value.trim(); // Assuming the price is already in the correct format (e.g., '10 CR')
+    const team = document.getElementById('team').value.trim();
+
+    if (!playerName || !price || !team) {
+        document.getElementById('result').innerHTML = '<span class="error">Please fill out all fields.</span>';
+        return;
+    }
+
+    if (playersSold.some(player => player.playerName === playerName)) {
+        document.getElementById('result').innerHTML = '<span class="error">This player has already been sold.</span>';
+        return;
+    }
+
+    fetch('/submit-bid', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                playerName: playerName,
+                price: price,
+                team: team
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('result').innerHTML = data.message;
+            updatePurse(data.teams);
+            updatePlayersSold(data.playersSold);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('result').innerHTML = '<span class="error">An error occurred. Please try again.</span>';
+        });
+}
+
+
+    </script>
+</body>
+
+</html>
